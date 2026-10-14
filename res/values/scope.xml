@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- These are recommendations, not a substitute for per-user app scope. -->
+    <string-array name="xposed_scope">
+        <item>android</item>
+        <item>com.motorola.deviceguard</item>
+        <item>com.motorola.launcher3</item>
+        <item>com.android.settings</item>
+        <item>com.android.systemui</item>
+        <item>com.android.permissioncontroller</item>
+        <item>com.android.providers.contacts</item>
+        <item>com.android.providers.media.module</item>
+        <item>com.android.packageinstaller</item>
+    </string-array>
+</resources>
