@@ -38,13 +38,18 @@ process limits still apply; no background/low-memory protections are disabled.
 
 These are real limitations, not claims of completed runtime support:
 
-1. **Process coverage:** System Framework and Security Center alone are
-   insufficient. App-local framework calls need injection in the launcher,
-   relevant system/provider processes, and the affected apps in each user.
-   Recommended scope metadata is not automatic scope installation. Vector's
-   user isolation requires the module to be installed in each targeted user.
-   This candidate does not provision those copies/scopes when new clones are
-   created; do not assume `initZygote` makes a scoped module global.
+1. **Process coverage:** Vector itself is installed **once, device-wide**;
+   neither its root module nor its manager needs installing into every clone.
+   Installing this module in owner 0 and scoping System Framework covers the
+   shared system_server for all users. But this candidate also hooks app-local
+   framework calls: those hooks need injection in the relevant launcher/provider
+   and clone-app processes, not just system_server. The reviewed Vector source
+   additionally requires this module's package to be marked installed in each
+   targeted app's user; Android shares the APK binary. This installation-state
+   requirement has not been verified against the phone's installed Vector 3080.
+   Recommended scope metadata is not automatic scope installation, and the
+   candidate does not provision new clone scopes/package registrations. Do not
+   assume `initZygote` makes a scoped module global.
 2. **Already-running processes:** supplemental GIDs are fixed at process
    startup. Existing owner/clone processes need an orderly restart after the
    profile topology changes to see newly added groups. No automatic process
