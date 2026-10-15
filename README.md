@@ -12,8 +12,9 @@ activation. Only 900–906 remain. The guard hooked `android.os.UserManager`,
 but Motorola's boot path calls `UserManagerService` directly. This is a module
 bug, not evidence that Vector cannot hook the policy. **Do not resume clone
 creation/reboot experiments on v0.2.** V0.3 corrects the hook target and test
-fixture; offline checks pass, but it is not installed or runtime-validated.
-An activation log does not establish safety. This update cannot recover deleted data.
+fixture; offline checks, owner-0 installation and cold activation with seven
+existing clones pass. **Above-budget preservation remains unverified.** An
+activation log does not establish safety. This update cannot recover deleted data.
 
 ## Implemented
 
@@ -84,7 +85,8 @@ These are real limitations, not claims of completed runtime support:
 4. **Actual runtime:** v0.2 cold activation and eighth-app launch passed, but
    **above-budget reboot preservation failed**: 907 was removed, not stopped.
    The observed `mMaxRunningUsers=8` is unchanged. V0.3 corrects the service-side
-   target and fixture, with installation and runtime validation pending.
+   target and fixture. Installation and cold activation with seven surviving
+   profiles are verified; above-budget reboot preservation remains untested.
    Extended-user provider/NFC fixes, IME, biometrics, app removal and mixed-user
    isolation remain unverified. GMS disablement and Motorola's dependency
    whitelist are unchanged.
@@ -94,8 +96,8 @@ it proves activation, not safety. Do not hot-reload this module. Disabling hooks
 or accepting an unsupported OTA does not itself delete profiles, but also does
 not protect them from Motorola's destructive boot cleanup. The
 `server policy active: version=0.2` log was present in the failed reboot too.
-A repaired build needs live verification of the actual deletion boundary before
-further profile testing. Never bulk-remove users or recreate the removed IDs as
+V0.3 needs a coordinated disposable-data test of the actual deletion boundary
+before broader profile testing. Never bulk-remove users or recreate the removed IDs as
 a supposed recovery.
 
 ## Build and offline checks
