@@ -30,8 +30,9 @@ final class RuntimeFixes {
                 if (remaining == 0) profileStarts.remove(); else profileStarts.set(remaining);
             }
         });
-        MainHook.hook(XposedHelpers.findClass("android.os.UserManager", null), "removeUser",
-                int.class, new XC_MethodHook() {
+        // Motorola's Injector returns the service directly, bypassing android.os.UserManager.
+        Class<?> userManager = XposedHelpers.findClass("com.android.server.pm.UserManagerService", loader);
+        MainHook.hook(userManager, "removeUser", int.class, new XC_MethodHook() {
             @Override protected void beforeHookedMethod(MethodHookParam p) {
                 // Keep the startup budget; a stopped clone is not a corrupt clone.
                 if (profileStarts.get() > 0 && isClone.test((Integer) p.args[0])) {

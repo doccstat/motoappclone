@@ -328,7 +328,7 @@ public final class MainHook implements IXposedHookLoadPackage {
                         XposedHelpers.setIntField(clone, "mMaxAllowedPerParent", ClonePolicy.LIMIT);
                         ready = true;
                     }
-                    XposedBridge.log(TAG + "server policy active: version=0.2, quota=21472, shared IDs=10..21472");
+                    XposedBridge.log(TAG + "server policy active: version=0.3, quota=21472, shared IDs=10..21472");
                 } catch (Throwable error) {
                     // Recognition/removal remain available for already-existing extended profiles.
                     ready = false;
