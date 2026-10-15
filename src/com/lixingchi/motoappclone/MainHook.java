@@ -68,7 +68,7 @@ public final class MainHook implements IXposedHookLoadPackage {
         }
     }
 
-    private static void hook(Class<?> type, String name, Object... parameters) {
+    static void hook(Class<?> type, String name, Object... parameters) {
         hooks.add(XposedHelpers.findAndHookMethod(type, name, parameters));
     }
 
@@ -300,6 +300,7 @@ public final class MainHook implements IXposedHookLoadPackage {
                 p.setResult(ClonePolicy.storageGroups((int[]) p.getResult(), clones));
             }
         });
+        RuntimeFixes.install(loader, MainHook::nativeClone);
         hooks.addAll(XposedBridge.hookAllConstructors(ums, new XC_MethodHook() {
             @Override protected void beforeHookedMethod(MethodHookParam p) {
                 userService = p.thisObject;
@@ -327,7 +328,7 @@ public final class MainHook implements IXposedHookLoadPackage {
                         XposedHelpers.setIntField(clone, "mMaxAllowedPerParent", ClonePolicy.LIMIT);
                         ready = true;
                     }
-                    XposedBridge.log(TAG + "server policy active: quota=21472, shared IDs=10..21472");
+                    XposedBridge.log(TAG + "server policy active: version=0.2, quota=21472, shared IDs=10..21472");
                 } catch (Throwable error) {
                     // Recognition/removal remain available for already-existing extended profiles.
                     ready = false;

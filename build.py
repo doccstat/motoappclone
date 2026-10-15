@@ -43,7 +43,7 @@ def main():
         run(sys.executable, '-B', ROOT / 'tools/audit_firmware.py', os.environ['FIRMWARE_DIR'])
     with tempfile.TemporaryDirectory(prefix='build-', dir=out) as temporary:
         build = Path(temporary)
-        for folder in ('classes', 'tests', 'dex'):
+        for folder in ('classes', 'tests', 'runtime-tests', 'dex'):
             (build / folder).mkdir()
         sources = sorted((ROOT / 'src').rglob('*.java'))
         run(jtool('javac'), '--release', '8', '-cp', os.pathsep.join(map(str, (android, api))),
@@ -52,6 +52,11 @@ def main():
             ROOT / 'tests/ClonePolicyTest.java')
         run(jtool('java'), '-ea', '-cp', os.pathsep.join(map(str, (build / 'classes', build / 'tests'))),
             'com.lixingchi.motoappclone.ClonePolicyTest')
+        run(jtool('javac'), '--release', '8', '-d', build / 'runtime-tests',
+            ROOT / 'src/com/lixingchi/motoappclone/RuntimeFixes.java',
+            *sorted((ROOT / 'tests/runtime').rglob('*.java')))
+        run(jtool('java'), '-ea', '-cp', build / 'runtime-tests',
+            'com.lixingchi.motoappclone.RuntimeHooksTest')
         run(tool('d8'), '--lib', android, '--classpath', api, '--min-api', '36',
             '--output', build / 'dex', *sorted((build / 'classes').rglob('*.class')))
         run(tool('aapt2'), 'compile', '--dir', ROOT / 'res', '-o', build / 'resources.zip')

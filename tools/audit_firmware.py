@@ -123,15 +123,44 @@ def audit(directory):
         (descriptor('com.motorola.plugin.core.rule.UserRule'), 'matchUserAlias',
          '(Ljava/lang/String;Ljava/lang/String;Landroid/os/UserManager;Z)Z'),
     }
+    helper = descriptor('com.android.server.am.ContentProviderHelper')
+    app_thread = descriptor('android.app.IApplicationThread')
+    provider = descriptor('com.android.server.am.ContentProviderRecord')
+    process = descriptor('com.android.server.am.ProcessRecord')
+    provider_get = '(' + app_thread + 'Ljava/lang/String;Ljava/lang/String;IZ)Landroid/app/ContentProviderHolder;'
+    checks |= {
+        (descriptor('android.os.UserManager'), 'removeUser', '(I)Z'),
+        (descriptor('com.android.server.am.UserController'), 'startProfiles', '()V'),
+        (helper, 'getContentProvider', provider_get),
+        (descriptor('com.android.server.am.ActivityManagerService'), 'getContentProvider', provider_get),
+        (helper, 'getContentProviderImpl', '(' + app_thread + 'Ljava/lang/String;Landroid/os/IBinder;'
+         'ILjava/lang/String;Ljava/lang/String;ZI)Landroid/app/ContentProviderHolder;'),
+        (helper, 'incProviderCountLocked', '(' + process + provider + 'Landroid/os/IBinder;I'
+         'Ljava/lang/String;Ljava/lang/String;ZZJLcom/android/server/am/ProcessList;I)'
+         'Lcom/android/server/am/ContentProviderConnection;'),
+        (helper, 'publishContentProviders', '(' + app_thread + 'Ljava/util/List;)V'),
+        (provider, 'onProviderPublishStatusLocked', '(Z)V'),
+        (provider, 'newHolder', '(Lcom/android/server/am/ContentProviderConnection;Z)Landroid/app/ContentProviderHolder;'),
+        (process, 'getThread', '()' + app_thread),
+        (app_thread, 'notifyContentProviderPublishStatus', '(Landroid/app/ContentProviderHolder;Ljava/lang/String;IZ)V'),
+    }
+    for name in ('com.android.server.pm.ComputerEngine', 'com.android.server.pm.IPackageManagerBase'):
+        checks.add((descriptor(name), 'getApplicationInfo', '(Ljava/lang/String;JI)Landroid/content/pm/ApplicationInfo;'))
     missing = checks - methods
     required_fields = {(ums, name) for name in (
         'mUsers', 'mUsersLock', 'mRemovingUserIds', 'mRecentlyRemovedIds',
         'mAppCloneUserRemoveTimes', 'mUserTypes', 'mSupportsAppClone')}
     required_fields |= {(descriptor('com.android.server.pm.UserTypeDetails'), name)
                         for name in ('mMaxAllowed', 'mMaxAllowedPerParent')}
+    required_fields |= {(provider, name) for name in ('connections', 'info', 'provider')}
+    required_fields |= {(descriptor('com.android.server.am.ContentProviderConnection'), name)
+                        for name in ('waiting', 'client')}
+    required_fields |= {(descriptor('android.content.pm.ProviderInfo'), 'authority'),
+                        (descriptor('android.content.pm.ApplicationInfo'), 'uid')}
     missing_fields = required_fields - {(owner, name) for owner, name, _ in fields}
-    # Every named deoptimization target in MainHook must actually be defined in the reviewed files.
-    source = (Path(__file__).resolve().parents[1] / 'src/com/lixingchi/motoappclone/MainHook.java').read_text()
+    # Named hook/deoptimization targets must actually be defined in the reviewed files.
+    source_dir = Path(__file__).resolve().parents[1] / 'src/com/lixingchi/motoappclone'
+    source = '\n'.join((source_dir / name).read_text() for name in ('MainHook.java', 'RuntimeFixes.java'))
     import re
     names = re.findall(r'"([a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)+)"', source)
     names = [name for name in names if name not in ('com.motorola.deviceguard', 'com.motorola.launcher3')]
