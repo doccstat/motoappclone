@@ -8,7 +8,7 @@ levels are refused. This is a **source/build candidate, not a validated
 **Both v0.1 and v0.2 have lost profiles in live tests.** V0.1 reached user 910,
 crashed and rebooted, losing 907–910. V0.2's new eighth clone (907) launched
 normally but was deleted during an ordinary reboot despite confirmed v0.2
-activation. Only 900–906 remain. The guard hooked `android.os.UserManager`,
+activation, leaving 900–906. The guard hooked `android.os.UserManager`,
 but Motorola's boot path calls `UserManagerService` directly. This is a module
 bug, not evidence that Vector cannot hook the policy. **Do not resume clone
 creation/reboot experiments on v0.2.** V0.3 corrects the hook target and test
@@ -86,7 +86,8 @@ These are real limitations, not claims of completed runtime support:
    **above-budget reboot preservation failed**: 907 was removed, not stopped.
    The observed `mMaxRunningUsers=8` is unchanged. V0.3 corrects the service-side
    target and fixture. Installation and cold activation with seven surviving
-   profiles are verified; above-budget reboot preservation remains untested.
+   profiles are verified. A new eighth clone (907/serial 912) runs unlocked;
+   foreground launch and above-budget reboot preservation remain untested.
    Extended-user provider/NFC fixes, IME, biometrics, app removal and mixed-user
    isolation remain unverified. GMS disablement and Motorola's dependency
    whitelist are unchanged.
