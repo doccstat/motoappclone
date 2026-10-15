@@ -129,7 +129,8 @@ def audit(directory):
     process = descriptor('com.android.server.am.ProcessRecord')
     provider_get = '(' + app_thread + 'Ljava/lang/String;Ljava/lang/String;IZ)Landroid/app/ContentProviderHolder;'
     checks |= {
-        (descriptor('android.os.UserManager'), 'removeUser', '(I)Z'),
+        (ums, 'removeUser', '(I)Z'),
+        (descriptor('com.android.server.am.UserController$Injector'), 'getUserManager', '()' + ums),
         (descriptor('com.android.server.am.UserController'), 'startProfiles', '()V'),
         (helper, 'getContentProvider', provider_get),
         (descriptor('com.android.server.am.ActivityManagerService'), 'getContentProvider', provider_get),

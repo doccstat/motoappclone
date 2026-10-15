@@ -5,13 +5,15 @@ RETCN Android 16 build `W1TR36H.1-33` (`865b8-1204f`). Other fingerprints/API
 levels are refused. This is a **source/build candidate, not a validated
 21,000-profile product**. Do not deploy it over valuable clone data yet.
 
-**Version 0.1 lost profiles in a live test:** user 910 caused Permission
-Controller, Contacts and NFC crashes, followed by a Rescue Party reboot.
-Motorola's boot cleanup removed clones 907–910, leaving 900–906.
-**Version 0.2 adds boot-preservation and server-side provider/context fixes.**
-Offline regressions pass, but the fixes have not been validated on Android.
-Do not create more profiles until cold activation is verified and a recoverable,
-disposable-data test is arranged. This update cannot recover deleted data.
+**Both v0.1 and v0.2 have lost profiles in live tests.** V0.1 reached user 910,
+crashed and rebooted, losing 907–910. V0.2's new eighth clone (907) launched
+normally but was deleted during an ordinary reboot despite confirmed v0.2
+activation. Only 900–906 remain. The guard hooked `android.os.UserManager`,
+but Motorola's boot path calls `UserManagerService` directly. This is a module
+bug, not evidence that Vector cannot hook the policy. **Do not resume clone
+creation/reboot experiments on v0.2.** V0.3 corrects the hook target and test
+fixture; offline checks pass, but it is not installed or runtime-validated.
+An activation log does not establish safety. This update cannot recover deleted data.
 
 ## Implemented
 
@@ -31,10 +33,10 @@ disposable-data test is arranged. This update cannot recover deleted data.
   recognition callers are deoptimized to address ART inlining, including
   provisioning, package visibility, providers, permissions, notifications,
   accounts, input methods, widgets and biometric integration.
-- Boot cleanup cannot delete recognized clones merely because the existing
-  running-user allowance leaves them stopped. Explicit removals outside
-  `startProfiles()` and partial-user cleanup retain stock behavior. This does
-  **not** raise the running-user limit or start every clone.
+- V0.3 targets `UserManagerService.removeUser(int)` during `startProfiles()`
+  instead of v0.2's unused client wrapper. It retains the running-user limit
+  and explicit removal handling outside that operation. The corrected fixture
+  rejects the old target, but preservation still needs on-device validation.
 - Missing clone providers are retried in owner 0 inside system_server, retaining
   the caller identity, package validation and provider permissions. Pending
   publications notify both original and clone request keys. This covers the
@@ -79,23 +81,22 @@ These are real limitations, not claims of completed runtime support:
    the ID pool is exhausted. Large supplemental-group/zygote requests and the
    native FUSE/SELinux paths also need validation. Do not bulk-create thousands
    of users to discover those limits on a daily-use phone.
-4. **Actual runtime:** v0.1 activation/allocation were observed, followed by
-   destructive failure. V0.2 cold activation with seven existing clones is
-   verified; extended-user provider/NFC and above-budget reboot persistence
-   remain untested. With the observed `mMaxRunningUsers=8`,
-   boot still starts only owner plus seven clones; additional clones should
-   remain registered but stopped. Their on-demand startup/launch is not yet
-   validated. IME, biometrics, app removal and mixed-user isolation also remain
-   unverified. GMS disablement and Motorola's dependency whitelist are unchanged.
+4. **Actual runtime:** v0.2 cold activation and eighth-app launch passed, but
+   **above-budget reboot preservation failed**: 907 was removed, not stopped.
+   The observed `mMaxRunningUsers=8` is unchanged. V0.3 corrects the service-side
+   target and fixture, with installation and runtime validation pending.
+   Extended-user provider/NFC fixes, IME, biometrics, app removal and mixed-user
+   isolation remain unverified. GMS disablement and Motorola's dependency
+   whitelist are unchanged.
 
 The `MotoAppClone: server policy active` log was present during the failed test;
 it proves activation, not safety. Do not hot-reload this module. Disabling hooks
 or accepting an unsupported OTA does not itself delete profiles, but also does
-not protect them from Motorola's destructive boot cleanup. V0.2 needs a
-coordinated cold start (no hot reload); verify the new
-`server policy active: version=0.2` log before any further creation. Hook
-registration alone is not runtime validation. Never bulk-remove users or recreate
-the removed IDs as a supposed recovery.
+not protect them from Motorola's destructive boot cleanup. The
+`server policy active: version=0.2` log was present in the failed reboot too.
+A repaired build needs live verification of the actual deletion boundary before
+further profile testing. Never bulk-remove users or recreate the removed IDs as
+a supposed recovery.
 
 ## Build and offline checks
 
@@ -134,11 +135,12 @@ future deployment; an ordinary Android debug-signed build is experimental only.
 
 The build runs four Python parser/audit tests and 21,537 JVM policy checks,
 including exhausting all 21,463 IDs in memory, classification, quarantine and
-GID arithmetic. Another 49 checks execute the production runtime callbacks
-against small framework/Xposed doubles: boot preservation, explicit removal,
-exception cleanup, provider publication, unchanged caller identity, access
-refusals and NFC's own-package fallback. These do **not** execute Xposed on
-Android. Test doubles are excluded from the APK.
+GID arithmetic. Another 51 checks execute the production runtime callbacks
+against small framework/Xposed doubles: direct service-side boot removal,
+separate client/service paths, explicit removal, exception cleanup, provider
+publication, unchanged caller identity, access refusals and NFC's own-package
+fallback. These do **not** execute Xposed on Android. Test doubles are excluded
+from the APK.
 
 For static hook verification, set `FIRMWARE_DIR` to a directory containing the
 seven matching, legally obtained artifacts named in `tools/audit_firmware.py`,

@@ -113,6 +113,13 @@ public final class RuntimeHooksTest {
         }
     }
     public static final class UserManager {
+        private final UserManagerService service;
+        UserManager(UserManagerService service) { this.service = service; }
+        public boolean removeUser(int id) throws Throwable {
+            return (Boolean) MainHook.invoke(service, "removeUser", id);
+        }
+    }
+    public static final class UserManagerService {
         public final List<Integer> removed = new ArrayList<>();
         public boolean removeUser(int id) {
             if (Binder.getCallingUid() != 1000) throw new SecurityException("MANAGE_USERS");
@@ -120,7 +127,7 @@ public final class RuntimeHooksTest {
         }
     }
     public static final class UserController {
-        public final UserManager users = new UserManager();
+        public final UserManagerService users = new UserManagerService();
         public int maxRunningUsers = 8;
         public final List<Integer> started = new ArrayList<>();
         public boolean fail;
@@ -144,6 +151,8 @@ public final class RuntimeHooksTest {
         check(controller.users.removed.isEmpty());
         check((Boolean) MainHook.invoke(controller.users, "removeUser", 910));
         check(controller.users.removed.equals(Arrays.asList(910)));
+        check((Boolean) MainHook.invoke(new UserManager(controller.users), "removeUser", 908));
+        check(controller.users.removed.equals(Arrays.asList(910, 908)));
         controller.users.removed.clear();
         controller.duringStart = () -> MainHook.invoke(controller, "startProfiles");
         MainHook.invoke(controller, "startProfiles");
@@ -259,6 +268,7 @@ public final class RuntimeHooksTest {
     public static void main(String[] args) throws Throwable {
         TYPES.put("com.android.server.am.UserController", UserController.class);
         TYPES.put("android.os.UserManager", UserManager.class);
+        TYPES.put("com.android.server.pm.UserManagerService", UserManagerService.class);
         TYPES.put("com.android.server.am.ContentProviderHelper", ProviderHelper.class);
         TYPES.put("com.android.server.am.ActivityManagerService", ProviderHelper.class);
         TYPES.put("android.app.IApplicationThread", AppThread.class);
