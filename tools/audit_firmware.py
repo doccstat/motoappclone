@@ -107,7 +107,6 @@ def audit(directory):
         (ums, 'scanNextAvailableIdLocked', '()I'),
         (ums, 'addRemovingUserIdLocked', '(I)V'),
         (ums, 'hasAppClone', '()Z'),
-        (ums, 'isCreationOverrideEnabled', '()Z'),
         (ums, 'createUserInternalUncheckedNoTracing',
          '(Ljava/lang/String;Ljava/lang/String;IIZ[Ljava/lang/String;'
          'Lcom/android/server/utils/TimingsTraceAndSlog;Ljava/lang/Object;)Landroid/content/pm/UserInfo;'),

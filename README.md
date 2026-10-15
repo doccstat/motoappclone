@@ -8,8 +8,8 @@ levels are refused. This is a **source/build candidate, not a validated
 ## Implemented
 
 - CLONE-only type and per-parent quotas, and Security Center's per-app limit:
-  **21472**. Other user-type quotas, permission checks, storage checks and
-  device-policy rules are not bypassed.
+  **21472**. This module does not bypass other user-type quotas, permission
+  checks, storage checks or device-policy rules.
 - Clone allocation prefers existing Moto IDs, then extends through **21472**,
   then uses remaining free IDs **10–899**. Existing IDs, serials and data are
   never migrated. Collisions with other users and pending deletions are rejected.
@@ -25,9 +25,9 @@ levels are refused. This is a **source/build candidate, not a validated
   accounts, input methods, widgets and biometric integration.
 - Motorola still owns app installation, labels, startup, settings synchronization
   and per-app removal. This module creates/removes **no profiles by itself**.
-- Cold-start-only activation, exact-build/member guards, rollback of partially
-  registered hooks, and refusal to enable creation while a global creation
-  override is active. Disable AlwaysCreateUser rather than stacking it.
+- Cold-start-only activation, exact-build/member guards and rollback of partially
+  registered hooks. No requirement to disable AlwaysCreateUser: other modules'
+  overrides remain their responsibility. Runtime coexistence is not yet tested.
 
 **21472 is the maximum user ID, not an attainable clone count.** Android's
 10–21472 pool has **21,463 slots**, shared with other users. The requested quota
