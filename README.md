@@ -5,12 +5,13 @@ RETCN Android 16 build `W1TR36H.1-33` (`865b8-1204f`). Other fingerprints/API
 levels are refused. This is a **source/build candidate, not a validated
 21,000-profile product**. Do not deploy it over valuable clone data yet.
 
-**Known destructive failure:** a live test reached user 910, then Permission
-Controller, Contacts and NFC crashed, followed by a Rescue Party reboot.
-Only clones 900–906 survived; 907–910 and their normal app-data directories were
-removed. Motorola's boot path deletes clones it does not start under the running
-user limit. This candidate does not prevent that deletion or cover all required
-app-local paths. **Stop further profile tests until both issues are fixed.**
+**Version 0.1 lost profiles in a live test:** user 910 caused Permission
+Controller, Contacts and NFC crashes, followed by a Rescue Party reboot.
+Motorola's boot cleanup removed clones 907–910, leaving 900–906.
+**Version 0.2 adds boot-preservation and server-side provider/context fixes.**
+Offline regressions pass, but the fixes have not been validated on Android.
+Do not create more profiles until cold activation is verified and a recoverable,
+disposable-data test is arranged. This update cannot recover deleted data.
 
 ## Implemented
 
@@ -30,6 +31,17 @@ app-local paths. **Stop further profile tests until both issues are fixed.**
   recognition callers are deoptimized to address ART inlining, including
   provisioning, package visibility, providers, permissions, notifications,
   accounts, input methods, widgets and biometric integration.
+- Boot cleanup cannot delete recognized clones merely because the existing
+  running-user allowance leaves them stopped. Explicit removals outside
+  `startProfiles()` and partial-user cleanup retain stock behavior. This does
+  **not** raise the running-user limit or start every clone.
+- Missing clone providers are retried in owner 0 inside system_server, retaining
+  the caller identity, package validation and provider permissions. Pending
+  publications notify both original and clone request keys. This covers the
+  failed Settings-provider lookup without injection into each cloned app.
+- An owner service such as NFC can obtain its own owner-installed package code
+  when its clone-context lookup returns null. The fallback requires the same
+  caller UID; it does not install NFC in clones or bypass access denials.
 - Motorola still owns app installation, labels, startup, settings synchronization
   and per-app removal. This module creates/removes **no profiles by itself**.
 - Cold-start-only activation, exact-build/member guards and rollback of partially
@@ -48,9 +60,10 @@ These are real limitations, not claims of completed runtime support:
 1. **Process coverage:** Vector itself is installed **once, device-wide**;
    neither its root module nor its manager needs installing into every clone.
    Installing this module in owner 0 and scoping System Framework covers the
-   shared system_server for all users. But this candidate also hooks app-local
-   framework calls: those hooks need injection in the relevant launcher/provider
-   and clone-app processes, not just system_server. The reviewed Vector source
+   shared system_server for all users, including the v0.2 crash fixes. Other
+   app-local framework hooks still need injection in the relevant processes;
+   these server fallbacks do not make all local clone recognition global.
+   The reviewed Vector source
    additionally requires this module's package to be marked installed in each
    targeted app's user; Android shares the APK binary. This installation-state
    requirement has not been verified against the phone's installed Vector 3080.
@@ -66,20 +79,22 @@ These are real limitations, not claims of completed runtime support:
    the ID pool is exhausted. Large supplemental-group/zygote requests and the
    native FUSE/SELinux paths also need validation. Do not bulk-create thousands
    of users to discover those limits on a daily-use phone.
-4. **Actual runtime:** framework activation and extended-ID allocation were
-   observed, but user 910 failed provider/context handling. The live
-   `mMaxRunningUsers=8` and disabled clone-count exemption let boot start only
-   owner plus seven clones; Motorola's subsequent cleanup deletes unstarted
-   clones. Non-destructive startup must be fixed before another test. IME,
-   biometrics, app removal and mixed-user isolation also remain unverified.
-   GMS disablement and Motorola's dependency whitelist are unchanged.
+4. **Actual runtime:** v0.1 activation/allocation were observed, followed by
+   destructive failure. V0.2 still needs cold-start, extended-user provider/NFC
+   and reboot-persistence validation. With the observed `mMaxRunningUsers=8`,
+   boot still starts only owner plus seven clones; additional clones should
+   remain registered but stopped. Their on-demand startup/launch is not yet
+   validated. IME, biometrics, app removal and mixed-user isolation also remain
+   unverified. GMS disablement and Motorola's dependency whitelist are unchanged.
 
 The `MotoAppClone: server policy active` log was present during the failed test;
 it proves activation, not safety. Do not hot-reload this module. Disabling hooks
 or accepting an unsupported OTA does not itself delete profiles, but also does
-not protect them from Motorola's destructive boot cleanup. A future fixed build
-needs disposable-data recovery and reboot validation before use. Never
-bulk-remove users or recreate the removed IDs as a supposed recovery.
+not protect them from Motorola's destructive boot cleanup. V0.2 needs a
+coordinated cold start (no hot reload); verify the new
+`server policy active: version=0.2` log before any further creation. Hook
+registration alone is not runtime validation. Never bulk-remove users or recreate
+the removed IDs as a supposed recovery.
 
 ## Build and offline checks
 
@@ -116,10 +131,13 @@ SIGNING_KEY_PASSWORD=<password supplied privately in environment>
 Signed output is **`MotoAppClone.apk`**. Use a stable private release key for
 future deployment; an ordinary Android debug-signed build is experimental only.
 
-The build runs four Python parser/audit tests plus JVM policy checks, including
-exhausting all 21,463 candidate IDs in memory, mixed-user classification, occupied
-and quarantined IDs, non-clone pairs, exact-build rejection and GID arithmetic.
-These tests do **not** execute Xposed on Android.
+The build runs four Python parser/audit tests and 21,537 JVM policy checks,
+including exhausting all 21,463 IDs in memory, classification, quarantine and
+GID arithmetic. Another 49 checks execute the production runtime callbacks
+against small framework/Xposed doubles: boot preservation, explicit removal,
+exception cleanup, provider publication, unchanged caller identity, access
+refusals and NFC's own-package fallback. These do **not** execute Xposed on
+Android. Test doubles are excluded from the APK.
 
 For static hook verification, set `FIRMWARE_DIR` to a directory containing the
 seven matching, legally obtained artifacts named in `tools/audit_firmware.py`,
