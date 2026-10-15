@@ -5,6 +5,13 @@ RETCN Android 16 build `W1TR36H.1-33` (`865b8-1204f`). Other fingerprints/API
 levels are refused. This is a **source/build candidate, not a validated
 21,000-profile product**. Do not deploy it over valuable clone data yet.
 
+**Known destructive failure:** a live test reached user 910, then Permission
+Controller, Contacts and NFC crashed, followed by a Rescue Party reboot.
+Only clones 900–906 survived; 907–910 and their normal app-data directories were
+removed. Motorola's boot path deletes clones it does not start under the running
+user limit. This candidate does not prevent that deletion or cover all required
+app-local paths. **Stop further profile tests until both issues are fixed.**
+
 ## Implemented
 
 - CLONE-only type and per-parent quotas, and Security Center's per-app limit:
@@ -59,17 +66,20 @@ These are real limitations, not claims of completed runtime support:
    the ID pool is exhausted. Large supplemental-group/zygote requests and the
    native FUSE/SELinux paths also need validation. Do not bulk-create thousands
    of users to discover those limits on a daily-use phone.
-4. **Actual runtime:** cold hook timing, inlining (including anonymous/synthetic
-   callers), profiles beyond 909, launcher, media/provider routing, IME,
-   biometrics, reboot/unlock, app removal, and mixed-user isolation remain
-   untested. GMS disablement and Motorola's dependency whitelist are unchanged.
+4. **Actual runtime:** framework activation and extended-ID allocation were
+   observed, but user 910 failed provider/context handling. The live
+   `mMaxRunningUsers=8` and disabled clone-count exemption let boot start only
+   owner plus seven clones; Motorola's subsequent cleanup deletes unstarted
+   clones. Non-destructive startup must be fixed before another test. IME,
+   biometrics, app removal and mixed-user isolation also remain unverified.
+   GMS disablement and Motorola's dependency whitelist are unchanged.
 
-Activation must be evaluated with disposable data and independent recovery
-access. Require the `MotoAppClone: server policy active` log, not merely a
-module-enabled checkbox or entry-class loading. Do not hot-reload this module.
-Disabling it or taking an unsupported OTA does **not** delete existing profiles;
-extended IDs will lose required integration. Re-enable the matching build or
-perform deliberate, scoped cleanup while it is working—never bulk-remove users.
+The `MotoAppClone: server policy active` log was present during the failed test;
+it proves activation, not safety. Do not hot-reload this module. Disabling hooks
+or accepting an unsupported OTA does not itself delete profiles, but also does
+not protect them from Motorola's destructive boot cleanup. A future fixed build
+needs disposable-data recovery and reboot validation before use. Never
+bulk-remove users or recreate the removed IDs as a supposed recovery.
 
 ## Build and offline checks
 
