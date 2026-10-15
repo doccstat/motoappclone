@@ -12,9 +12,10 @@ activation, leaving 900–906. The guard hooked `android.os.UserManager`,
 but Motorola's boot path calls `UserManagerService` directly. This is a module
 bug, not evidence that Vector cannot hook the policy. **Do not resume clone
 creation/reboot experiments on v0.2.** V0.3 corrects the hook target and test
-fixture; offline checks, owner-0 installation and cold activation with seven
-existing clones pass. **Above-budget preservation remains unverified.** An
-activation log does not establish safety. This update cannot recover deleted data.
+fixture. One eight-clone reboot now **preserved 907 with the same serial** and
+logged `retained stopped clone 907`. It remains stopped under the unchanged
+startup budget; on-demand launch and extended-ID integration remain unverified.
+This single pass does not establish general safety or recover deleted data.
 
 ## Implemented
 
@@ -37,7 +38,8 @@ activation log does not establish safety. This update cannot recover deleted dat
 - V0.3 targets `UserManagerService.removeUser(int)` during `startProfiles()`
   instead of v0.2's unused client wrapper. It retains the running-user limit
   and explicit removal handling outside that operation. The corrected fixture
-  rejects the old target, but preservation still needs on-device validation.
+  rejects the old target; one live reboot confirms interception and retention
+  of the eighth clone as stopped, not automatic startup.
 - Missing clone providers are retried in owner 0 inside system_server, retaining
   the caller identity, package validation and provider permissions. Pending
   publications notify both original and clone request keys. This covers the
@@ -85,9 +87,9 @@ These are real limitations, not claims of completed runtime support:
 4. **Actual runtime:** v0.2 cold activation and eighth-app launch passed, but
    **above-budget reboot preservation failed**: 907 was removed, not stopped.
    The observed `mMaxRunningUsers=8` is unchanged. V0.3 corrects the service-side
-   target and fixture. Installation and cold activation with seven surviving
-   profiles are verified. A new eighth clone (907/serial 912) runs unlocked;
-   foreground launch and above-budget reboot preservation remain untested.
+   target and fixture. The eighth clone (907/serial 912) survived one reboot
+   with the retention callback logged. Owner and 900–906 run unlocked; 907 is
+   registered but stopped. Launching that stopped profile remains untested.
    Extended-user provider/NFC fixes, IME, biometrics, app removal and mixed-user
    isolation remain unverified. GMS disablement and Motorola's dependency
    whitelist are unchanged.
@@ -97,9 +99,9 @@ it proves activation, not safety. Do not hot-reload this module. Disabling hooks
 or accepting an unsupported OTA does not itself delete profiles, but also does
 not protect them from Motorola's destructive boot cleanup. The
 `server policy active: version=0.2` log was present in the failed reboot too.
-V0.3 needs a coordinated disposable-data test of the actual deletion boundary
-before broader profile testing. Never bulk-remove users or recreate the removed IDs as
-a supposed recovery.
+V0.3's single retention pass does not validate stopped-profile launch or IDs
+beyond 909. Expand one disposable clone at a time, with checks between steps.
+Never bulk-remove users or recreate removed IDs as a supposed recovery.
 
 ## Build and offline checks
 
