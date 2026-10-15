@@ -310,9 +310,6 @@ public final class MainHook implements IXposedHookLoadPackage {
                     if (!XposedHelpers.getBooleanField(p.thisObject, "mSupportsAppClone")) {
                         throw new IllegalStateException("Native cloning unavailable");
                     }
-                    if ((Boolean) XposedHelpers.callMethod(p.thisObject, "isCreationOverrideEnabled")) {
-                        throw new IllegalStateException("Disable global creation-override modules first");
-                    }
                     synchronized (field(p.thisObject, "mUsersLock")) {
                         SparseArray<Object> existing = users(p.thisObject);
                         for (int i = 0; i < existing.size(); i++) {
