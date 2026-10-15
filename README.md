@@ -80,8 +80,9 @@ These are real limitations, not claims of completed runtime support:
    native FUSE/SELinux paths also need validation. Do not bulk-create thousands
    of users to discover those limits on a daily-use phone.
 4. **Actual runtime:** v0.1 activation/allocation were observed, followed by
-   destructive failure. V0.2 still needs cold-start, extended-user provider/NFC
-   and reboot-persistence validation. With the observed `mMaxRunningUsers=8`,
+   destructive failure. V0.2 cold activation with seven existing clones is
+   verified; extended-user provider/NFC and above-budget reboot persistence
+   remain untested. With the observed `mMaxRunningUsers=8`,
    boot still starts only owner plus seven clones; additional clones should
    remain registered but stopped. Their on-demand startup/launch is not yet
    validated. IME, biometrics, app removal and mixed-user isolation also remain
