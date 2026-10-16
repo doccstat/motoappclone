@@ -53,6 +53,7 @@ def main():
         run(jtool('java'), '-ea', '-cp', os.pathsep.join(map(str, (build / 'classes', build / 'tests'))),
             'com.lixingchi.motoappclone.ClonePolicyTest')
         run(jtool('javac'), '--release', '8', '-d', build / 'runtime-tests',
+            ROOT / 'src/com/lixingchi/motoappclone/ClonePolicy.java',
             ROOT / 'src/com/lixingchi/motoappclone/RuntimeFixes.java',
             *sorted((ROOT / 'tests/runtime').rglob('*.java')))
         run(jtool('java'), '-ea', '-cp', build / 'runtime-tests',

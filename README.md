@@ -42,6 +42,11 @@ establish general safety or recover deleted data.
   and explicit removal handling outside that operation. The corrected fixture
   rejects the old target; one live reboot confirms interception and retention
   of the eighth clone as stopped, not automatic startup.
+- V0.4 replaces Motorola's `UserController.setInitialConfig()` running-user
+  argument with **21472**, so the native boot path can start every eligible
+  retained profile instead of applying the stock soft limit. This is a
+  deliberate resource-pressure experiment, not evidence that the device can
+  run 21472 profiles.
 - Missing clone providers are retried in owner 0 inside system_server, retaining
   the caller identity, package validation and provider permissions. Pending
   publications notify both original and clone request keys. This covers the
@@ -88,15 +93,16 @@ These are real limitations, not claims of completed runtime support:
    of users to discover those limits on a daily-use phone.
 4. **Actual runtime:** v0.2 cold activation and eighth-app launch passed, but
    **above-budget reboot preservation failed**: 907 was removed, not stopped.
-   The observed `mMaxRunningUsers=8` is unchanged. V0.3 corrects the service-side
-   target and fixture. The eighth clone (907/serial 912) survived one reboot
-   with the retention callback logged. Owner and 900–906 run unlocked; 907 is
-   registered but stopped. Tapping its launcher icon currently falls back to the
-   owner instance; this is not a successful 907 launch. A clone created after
-   reboot starts normally because Motorola explicitly starts newly created
-   profiles. Extended-user provider/NFC fixes, IME, biometrics, app removal and mixed-user
-   isolation remain unverified. GMS disablement and Motorola's dependency
-   whitelist are unchanged.
+   V0.3 corrected the removal target and retained 907/serial 912, but the stock
+   `mMaxRunningUsers=8` budget still started only owner plus seven clones, so
+   907 stayed stopped and its launcher icon fell back to the owner. V0.4
+   replaces that budget during native initialization with 21472 and is now
+   installed on owner 0 (APK SHA-256
+   `ae0db11b7ba6a3d9bdf20ce63c0a43b9d0b50fbc13811000fcb636412ce0678c`).
+   Cold activation and a nine-profile boot are pending the operator reboot.
+   Extended-user provider/NFC fixes, IME, biometrics, app removal and
+   mixed-user isolation remain unverified. GMS disablement and Motorola's
+   dependency whitelist are unchanged.
 
 The `MotoAppClone: server policy active` log was present during the failed test;
 it proves activation, not safety. Do not hot-reload this module. Disabling hooks

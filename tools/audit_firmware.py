@@ -128,10 +128,12 @@ def audit(directory):
     provider = descriptor('com.android.server.am.ContentProviderRecord')
     process = descriptor('com.android.server.am.ProcessRecord')
     provider_get = '(' + app_thread + 'Ljava/lang/String;Ljava/lang/String;IZ)Landroid/app/ContentProviderHolder;'
+    controller = descriptor('com.android.server.am.UserController')
     checks |= {
         (ums, 'removeUser', '(I)Z'),
         (descriptor('com.android.server.am.UserController$Injector'), 'getUserManager', '()' + ums),
-        (descriptor('com.android.server.am.UserController'), 'startProfiles', '()V'),
+        (controller, 'setInitialConfig', '(ZIZI)V'),
+        (controller, 'startProfiles', '()V'),
         (helper, 'getContentProvider', provider_get),
         (descriptor('com.android.server.am.ActivityManagerService'), 'getContentProvider', provider_get),
         (helper, 'getContentProviderImpl', '(' + app_thread + 'Ljava/lang/String;Landroid/os/IBinder;'
@@ -151,6 +153,7 @@ def audit(directory):
     required_fields = {(ums, name) for name in (
         'mUsers', 'mUsersLock', 'mRemovingUserIds', 'mRecentlyRemovedIds',
         'mAppCloneUserRemoveTimes', 'mUserTypes', 'mSupportsAppClone')}
+    required_fields.add((controller, 'mMaxRunningUsers'))
     required_fields |= {(descriptor('com.android.server.pm.UserTypeDetails'), name)
                         for name in ('mMaxAllowed', 'mMaxAllowedPerParent')}
     required_fields |= {(provider, name) for name in ('connections', 'info', 'provider')}

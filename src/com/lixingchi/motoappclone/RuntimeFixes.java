@@ -21,6 +21,12 @@ final class RuntimeFixes {
 
     static void install(ClassLoader loader, IntPredicate isClone) throws Exception {
         Class<?> controller = XposedHelpers.findClass("com.android.server.am.UserController", loader);
+        MainHook.hook(controller, "setInitialConfig", boolean.class, int.class, boolean.class, int.class,
+                new XC_MethodHook() {
+            @Override protected void beforeHookedMethod(MethodHookParam p) {
+                p.args[1] = ClonePolicy.LIMIT;
+            }
+        });
         MainHook.hook(controller, "startProfiles", new XC_MethodHook() {
             @Override protected void beforeHookedMethod(MethodHookParam p) {
                 profileStarts.set(profileStarts.get() + 1);
