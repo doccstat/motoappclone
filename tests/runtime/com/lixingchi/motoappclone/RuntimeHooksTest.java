@@ -132,6 +132,10 @@ public final class RuntimeHooksTest {
         public final List<Integer> started = new ArrayList<>();
         public boolean fail;
         public Action duringStart;
+        public void setInitialConfig(boolean userSwitchUiEnabled, int maxRunningUsers,
+                boolean delayUserDataLocking, int backgroundUserScheduledStopTimeSecs) {
+            this.maxRunningUsers = maxRunningUsers;
+        }
         public void startProfiles() throws Throwable {
             for (int i = 900; i <= 910; i++) {
                 if (i - 900 < maxRunningUsers - 1) started.add(i);
@@ -144,6 +148,9 @@ public final class RuntimeHooksTest {
 
     private static void bootTests() throws Throwable {
         Binder.setCallingUid(1000);
+        UserController configured = new UserController();
+        MainHook.invoke(configured, "setInitialConfig", true, 8, false, 0);
+        check(configured.maxRunningUsers == ClonePolicy.LIMIT);
         UserController controller = new UserController();
         MainHook.invoke(controller, "startProfiles");
         check(controller.maxRunningUsers == 8);

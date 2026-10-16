@@ -212,6 +212,8 @@ public final class MainHook implements IXposedHookLoadPackage {
         Class<?> details = XposedHelpers.findClass("com.android.server.pm.UserTypeDetails", loader);
         XposedHelpers.findField(details, "mMaxAllowedPerParent");
         XposedHelpers.findField(details, "mMaxAllowed");
+        Class<?> controller = XposedHelpers.findClass("com.android.server.am.UserController", loader);
+        XposedHelpers.findField(controller, "mMaxRunningUsers");
         Class<?> trace = XposedHelpers.findClass("com.android.server.utils.TimingsTraceAndSlog", loader);
         hook(ums, "createUserInternalUncheckedNoTracing", String.class, String.class, int.class,
                 int.class, boolean.class, String[].class, trace, Object.class, new XC_MethodHook() {
@@ -328,7 +330,7 @@ public final class MainHook implements IXposedHookLoadPackage {
                         XposedHelpers.setIntField(clone, "mMaxAllowedPerParent", ClonePolicy.LIMIT);
                         ready = true;
                     }
-                    XposedBridge.log(TAG + "server policy active: version=0.3, quota=21472, shared IDs=10..21472");
+                    XposedBridge.log(TAG + "server policy active: version=0.4, quota=21472, maxRunningUsers=21472, shared IDs=10..21472");
                 } catch (Throwable error) {
                     // Recognition/removal remain available for already-existing extended profiles.
                     ready = false;
