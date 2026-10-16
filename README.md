@@ -101,9 +101,11 @@ These are real limitations, not claims of completed runtime support:
    `ae0db11b7ba6a3d9bdf20ce63c0a43b9d0b50fbc13811000fcb636412ce0678c`).
    One reboot then reported `mMaxRunningUsers:21472` with owner and 900–908 all
    `RUNNING_UNLOCKED`; every clone, including the previously-stopped 907, opened
-   normally. Extended-user provider/NFC fixes (IDs ≥ 910), IME, biometrics, app
-   removal and mixed-user isolation remain unverified. GMS disablement and
-   Motorola's dependency whitelist are unchanged.
+   normally. A tenth clone (909) was then created, survived another reboot and
+   opened normally; its per-user `POST_NOTIFICATIONS` grant is why only it could
+   show the WhatsApp GMS notice. Extended-user provider/NFC fixes (IDs ≥ 910),
+   IME, biometrics, app removal and mixed-user isolation remain unverified.
+   GMS disablement and Motorola's dependency whitelist are unchanged.
 
 The `MotoAppClone: server policy active` log was present during the failed test;
 it proves activation, not safety. Do not hot-reload this module. Disabling hooks
