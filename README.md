@@ -14,8 +14,10 @@ bug, not evidence that Vector cannot hook the policy. **Do not resume clone
 creation/reboot experiments on v0.2.** V0.3 corrects the hook target and test
 fixture. One eight-clone reboot now **preserved 907 with the same serial** and
 logged `retained stopped clone 907`. It remains stopped under the unchanged
-startup budget; on-demand launch and extended-ID integration remain unverified.
-This single pass does not establish general safety or recover deleted data.
+startup budget. A native tap after reboot opened the owner instance rather than
+proving an on-demand start for 907; a ninth created after reboot launches
+normally. Extended-ID integration remains unverified. This single pass does not
+establish general safety or recover deleted data.
 
 ## Implemented
 
@@ -89,8 +91,10 @@ These are real limitations, not claims of completed runtime support:
    The observed `mMaxRunningUsers=8` is unchanged. V0.3 corrects the service-side
    target and fixture. The eighth clone (907/serial 912) survived one reboot
    with the retention callback logged. Owner and 900–906 run unlocked; 907 is
-   registered but stopped. Launching that stopped profile remains untested.
-   Extended-user provider/NFC fixes, IME, biometrics, app removal and mixed-user
+   registered but stopped. Tapping its launcher icon currently falls back to the
+   owner instance; this is not a successful 907 launch. A clone created after
+   reboot starts normally because Motorola explicitly starts newly created
+   profiles. Extended-user provider/NFC fixes, IME, biometrics, app removal and mixed-user
    isolation remain unverified. GMS disablement and Motorola's dependency
    whitelist are unchanged.
 
