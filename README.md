@@ -99,10 +99,11 @@ These are real limitations, not claims of completed runtime support:
    replaces that budget during native initialization with 21472 and is now
    installed on owner 0 (APK SHA-256
    `ae0db11b7ba6a3d9bdf20ce63c0a43b9d0b50fbc13811000fcb636412ce0678c`).
-   Cold activation and a nine-profile boot are pending the operator reboot.
-   Extended-user provider/NFC fixes, IME, biometrics, app removal and
-   mixed-user isolation remain unverified. GMS disablement and Motorola's
-   dependency whitelist are unchanged.
+   One reboot then reported `mMaxRunningUsers:21472` with owner and 900–908 all
+   `RUNNING_UNLOCKED`; every clone, including the previously-stopped 907, opened
+   normally. Extended-user provider/NFC fixes (IDs ≥ 910), IME, biometrics, app
+   removal and mixed-user isolation remain unverified. GMS disablement and
+   Motorola's dependency whitelist are unchanged.
 
 The `MotoAppClone: server policy active` log was present during the failed test;
 it proves activation, not safety. Do not hot-reload this module. Disabling hooks
