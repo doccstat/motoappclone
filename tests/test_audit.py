@@ -1,10 +1,8 @@
-import hashlib
 import importlib.util
 from pathlib import Path
 import struct
 import tempfile
 import unittest
-from unittest.mock import patch
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -65,23 +63,22 @@ class AuditTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit.dex_members(b'not dex')
 
-    def test_hash_lengths_and_fail_closed(self):
-        for digest in audit.HASHES.values():
-            self.assertEqual(len(bytes.fromhex(digest)), 32)
+    def test_missing_or_invalid_artifacts_fail_closed(self):
         with tempfile.TemporaryDirectory(dir=TEST_CACHE) as temporary:
+            with self.assertRaisesRegex(ValueError, 'No APK/JAR'):
+                audit.audit(Path(temporary))
             path = Path(temporary) / 'framework.jar'
-            path.write_bytes(b'wrong firmware')
-            with self.assertRaisesRegex(ValueError, 'Unsupported artifact hash'):
+            path.write_bytes(b'not a jar')
+            with self.assertRaises(zipfile.BadZipFile):
                 audit.audit(Path(temporary))
 
-    def test_missing_members_rejected_after_hash_check(self):
+    def test_arbitrary_artifact_names_are_checked_by_members_not_hash(self):
         with tempfile.TemporaryDirectory(dir=TEST_CACHE) as temporary:
-            path = Path(temporary) / 'framework.jar'
+            path = Path(temporary) / 'different-firmware.apk'
             with zipfile.ZipFile(path, 'w') as archive:
                 archive.writestr('classes.dex', minimal_dex())
-            with patch.dict(audit.HASHES, {'framework.jar': hashlib.sha256(path.read_bytes()).hexdigest()}, clear=True):
-                with self.assertRaisesRegex(ValueError, 'Missing methods'):
-                    audit.audit(Path(temporary))
+            with self.assertRaisesRegex(ValueError, 'Missing methods'):
+                audit.audit(Path(temporary))
 
 
 if __name__ == '__main__':

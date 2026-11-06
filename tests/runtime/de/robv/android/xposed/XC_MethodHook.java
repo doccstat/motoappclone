@@ -4,6 +4,11 @@ import java.lang.reflect.Member;
 
 /** Test double for callback ordering, results and exception propagation. */
 public abstract class XC_MethodHook {
+    public final class Unhook {
+        private final Member member;
+        public Unhook(Member member) { this.member = member; }
+        public void unhook() { XposedBridge.HOOKS.remove(member); }
+    }
     public static final class MethodHookParam {
         public Member method;
         public Object thisObject;

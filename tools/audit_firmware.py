@@ -1,22 +1,11 @@
 #!/usr/bin/env python3
-"""Read-only exact-artifact and DEX member checks. No decompiler or device required."""
+"""Inspect supplied APK/JAR declarations against the module's native service contracts."""
 import argparse
 import hashlib
 import json
 from pathlib import Path
 import struct
 import zipfile
-
-HASHES = {
-    'framework.jar': 'e46185e9155f420e1f55949b6e7999250a079a957192be40d54e453a2815fc47',
-    'services.jar': '9eb15bc0c1feb271d86c2ce9025feb29d1e01e170e34fd62cd8d68beede40204',
-    'PrcSecurityCenter.apk': 'c2076d421ef2b74efef667c255d1fd2cdb5659b4574a724fc4f6228b18848107',
-    'Launcher3QuickStep.apk': 'a8f766d645543cdd17e3f11f7ac3e8c4015e9f17af47076af43021566afe10fe',
-    'moto-core_services.jar': '1f82be58c58a54b98995302ffe26d85713ba3969cb5937e2d29c10324cbd6e4d',
-    'com.motorola.frameworks.core.addon.jar': '07bd2b7c80692a1aec59a3ebad8c1db011a9525732330cbdf904b6246ed9ee38',
-    'moto-settings.jar': 'e0a7036a686c0ad8473384cd1fee0a1e691ca3199a9c8c7e10d420a3a8ece5c6',
-}
-
 
 def uleb(data, offset):
     value = 0
@@ -86,10 +75,12 @@ def dex_members(data):
 
 def audit(directory):
     classes, fields, methods = set(), set(), set()
-    for filename, expected in HASHES.items():
-        path = directory / filename
-        if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
-            raise ValueError('Unsupported artifact hash: ' + filename)
+    paths = sorted([*directory.glob('*.jar'), *directory.glob('*.apk')])
+    if not paths:
+        raise ValueError('No APK/JAR artifacts supplied')
+    hashes = {}
+    for path in paths:
+        hashes[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
         with zipfile.ZipFile(path) as archive:
             for name in archive.namelist():
                 if name.startswith('classes') and name.endswith('.dex'):
@@ -119,7 +110,6 @@ def audit(directory):
         (descriptor('android.os.IUserManager$Stub$Proxy'), 'getUserInfo', '(I)Landroid/content/pm/UserInfo;'),
         (descriptor('android.os.IUserManager$Stub$Proxy'), 'getProfileType', '(I)Ljava/lang/String;'),
         (descriptor('android.os.IUserManager$Stub$Proxy'), 'getProfileParent', '(I)Landroid/content/pm/UserInfo;'),
-        (descriptor('v2.d'), 'x', '()I'),
         (descriptor('com.motorola.plugin.core.rule.UserRule'), 'matchUserAlias',
          '(Ljava/lang/String;Ljava/lang/String;Landroid/os/UserManager;Z)Z'),
     }
@@ -131,7 +121,6 @@ def audit(directory):
     controller = descriptor('com.android.server.am.UserController')
     checks |= {
         (ums, 'removeUser', '(I)Z'),
-        (descriptor('com.android.server.am.UserController$Injector'), 'getUserManager', '()' + ums),
         (controller, 'setInitialConfig', '(ZIZI)V'),
         (controller, 'startProfiles', '()V'),
         (helper, 'getContentProvider', provider_get),
@@ -152,7 +141,10 @@ def audit(directory):
     missing = checks - methods
     required_fields = {(ums, name) for name in (
         'mUsers', 'mUsersLock', 'mRemovingUserIds', 'mRecentlyRemovedIds',
-        'mAppCloneUserRemoveTimes', 'mUserTypes', 'mSupportsAppClone')}
+        'mAppCloneUserRemoveTimes', 'mUserTypes', 'mSupportsAppClone',
+        'MIN_USER_ID', 'MAX_USER_ID', 'MAX_RECENTLY_REMOVED_IDS_SIZE')}
+    required_fields |= {(descriptor('android.os.UserHandle'), name) for name in
+                        ('MIN_APP_CLONE_USER_ID', 'MAX_APP_CLONE_USER_ID', 'PER_USER_RANGE')}
     required_fields.add((controller, 'mMaxRunningUsers'))
     required_fields |= {(descriptor('com.android.server.pm.UserTypeDetails'), name)
                         for name in ('mMaxAllowed', 'mMaxAllowedPerParent')}
@@ -162,20 +154,19 @@ def audit(directory):
     required_fields |= {(descriptor('android.content.pm.ProviderInfo'), 'authority'),
                         (descriptor('android.content.pm.ApplicationInfo'), 'uid')}
     missing_fields = required_fields - {(owner, name) for owner, name, _ in fields}
-    # Named hook/deoptimization targets must actually be defined in the reviewed files.
+    # Required named hook targets, not optional caller classes or obfuscated application names.
     source_dir = Path(__file__).resolve().parents[1] / 'src/com/lixingchi/motoappclone'
     source = '\n'.join((source_dir / name).read_text() for name in ('MainHook.java', 'RuntimeFixes.java'))
     import re
     names = re.findall(r'"([a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)+)"', source)
     names = [name for name in names if name not in ('com.motorola.deviceguard', 'com.motorola.launcher3')]
-    names += ['com.android.server.pm.UserManagerService$LocalService']
     missing_classes = {name for name in names if descriptor(name) not in classes}
     if missing or missing_fields or missing_classes:
         raise ValueError(f'Missing methods={sorted(missing)}, fields={sorted(missing_fields)}, '
                          f'classes={sorted(missing_classes)}')
-    return {'artifacts': HASHES, 'method_checks': len(checks), 'field_checks': len(required_fields),
-            'deoptimization_and_lookup_classes': len(set(names)),
-            'status': 'Exact artifacts and declared members verified; runtime hooks NOT tested'}
+    return {'artifacts': hashes, 'method_checks': len(checks), 'field_checks': len(required_fields),
+            'lookup_classes': len(set(names)),
+            'status': 'Declared members verified; runtime behavior and inlining coverage are not certified'}
 
 
 if __name__ == '__main__':

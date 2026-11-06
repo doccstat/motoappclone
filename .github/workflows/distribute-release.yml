@@ -1,0 +1,86 @@
+name: Distribute release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published source tag (versionCode-versionName)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Serialize with signing so same-version assets cannot change during verification.
+concurrency:
+  group: signed-release
+  cancel-in-progress: false
+
+env:
+  LISTING_REPOSITORY: Xposed-Modules-Repo/com.lixingchi.motoappclone
+
+jobs:
+  distribute:
+    if: github.repository == 'doccstat/motoappclone' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Resolve the selected published source release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^[1-9][0-9]*-[0-9]+(\.[0-9]+)+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" >"$RUNNER_TEMP/source-release.json"
+          test "$(jq -r .draft "$RUNNER_TEMP/source-release.json")" = false
+          test "$(jq -r .tag_name "$RUNNER_TEMP/source-release.json")" = "$RELEASE_TAG"
+          jq -r .body "$RUNNER_TEMP/source-release.json" >"$RUNNER_TEMP/release-notes.md"
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: platform-tools
+      - name: Install pinned verification tools
+        run: sdkmanager 'build-tools;37.0.0'
+      - name: Download and verify the exact source APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          SIGNING_CERT_SHA256: ${{ vars.ANDROID_SIGNING_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern MotoAppClone.apk --pattern MotoAppClone.apk.sha256 \
+            --dir "$RUNNER_TEMP/verified-release"
+          python3 -B tools/verify_release.py --directory "$RUNNER_TEMP/verified-release" \
+            --tag "$RELEASE_TAG" --build-tools "$ANDROID_HOME/build-tools/37.0.0"
+      - name: Mirror the verified assets with the source release status
+        env:
+          GH_TOKEN: ${{ secrets.LSPOSED_RELEASE_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          test -n "$GH_TOKEN" || { echo '::error::Configure LSPOSED_RELEASE_TOKEN after the listing is created.'; exit 1; }
+          repo="$LISTING_REPOSITORY"
+          prerelease=$(jq -r .prerelease "$RUNNER_TEMP/source-release.json")
+          latest=false
+          if [ "$prerelease" = false ]; then latest=true; fi
+          cd "$RUNNER_TEMP/verified-release"
+          releases=$(gh api --paginate --slurp "repos/$repo/releases?per_page=100")
+          if jq -e --arg tag "$RELEASE_TAG" '[.[][] | select(.tag_name == $tag)] | length > 0' <<<"$releases" >/dev/null; then
+            gh release upload "$RELEASE_TAG" --repo "$repo" --clobber MotoAppClone.apk MotoAppClone.apk.sha256
+            gh release edit "$RELEASE_TAG" --repo "$repo" \
+              --title "${RELEASE_TAG#*-}" --notes-file "$RUNNER_TEMP/release-notes.md" \
+              --draft=false --prerelease="$prerelease" --latest="$latest"
+          else
+            gh release create "$RELEASE_TAG" --repo "$repo" \
+              --title "${RELEASE_TAG#*-}" --notes-file "$RUNNER_TEMP/release-notes.md" \
+              --prerelease="$prerelease" --latest="$latest" MotoAppClone.apk MotoAppClone.apk.sha256
+          fi

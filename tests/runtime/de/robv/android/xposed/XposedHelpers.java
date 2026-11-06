@@ -1,6 +1,7 @@
 package de.robv.android.xposed;
 
 import com.lixingchi.motoappclone.RuntimeHooksTest;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -12,6 +13,13 @@ public final class XposedHelpers {
         Class<?> result = RuntimeHooksTest.TYPES.get(name);
         if (result == null) throw new AssertionError("Unmapped framework class: " + name);
         return result;
+    }
+    public static Class<?> findClassIfExists(String name, ClassLoader loader) {
+        return RuntimeHooksTest.TYPES.get(name);
+    }
+    public static Field findField(Class<?> type, String name) {
+        try { return type.getField(name); }
+        catch (ReflectiveOperationException error) { throw new AssertionError(error); }
     }
     public static Method findMethodExact(Class<?> type, String name, Class<?>... args) {
         try { return type.getMethod(name, args); }
