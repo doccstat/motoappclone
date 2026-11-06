@@ -3,7 +3,7 @@ package com.lixingchi.motoappclone;
 import android.os.Binder;
 
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Member;
+import static com.lixingchi.motoappclone.Hooks.hook;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -21,13 +21,14 @@ final class RuntimeFixes {
 
     static void install(ClassLoader loader, IntPredicate isClone) throws Exception {
         Class<?> controller = XposedHelpers.findClass("com.android.server.am.UserController", loader);
-        MainHook.hook(controller, "setInitialConfig", boolean.class, int.class, boolean.class, int.class,
+        Hooks.field(controller, "mMaxRunningUsers", int.class);
+        hook(controller, "setInitialConfig", void.class, boolean.class, int.class, boolean.class, int.class,
                 new XC_MethodHook() {
             @Override protected void beforeHookedMethod(MethodHookParam p) {
                 p.args[1] = ClonePolicy.LIMIT;
             }
         });
-        MainHook.hook(controller, "startProfiles", new XC_MethodHook() {
+        hook(controller, "startProfiles", void.class, new XC_MethodHook() {
             @Override protected void beforeHookedMethod(MethodHookParam p) {
                 profileStarts.set(profileStarts.get() + 1);
             }
@@ -38,9 +39,9 @@ final class RuntimeFixes {
         });
         // Motorola's Injector returns the service directly, bypassing android.os.UserManager.
         Class<?> userManager = XposedHelpers.findClass("com.android.server.pm.UserManagerService", loader);
-        MainHook.hook(userManager, "removeUser", int.class, new XC_MethodHook() {
+        hook(userManager, "removeUser", boolean.class, int.class, new XC_MethodHook() {
             @Override protected void beforeHookedMethod(MethodHookParam p) {
-                // Keep the startup budget; a stopped clone is not a corrupt clone.
+                // A stopped clone is not a corrupt clone; explicit removals remain unchanged.
                 if (profileStarts.get() > 0 && isClone.test((Integer) p.args[0])) {
                     XposedBridge.log("MotoAppClone: retained stopped clone " + p.args[0]);
                     p.setResult(false);
@@ -53,11 +54,17 @@ final class RuntimeFixes {
         Class<?> provider = XposedHelpers.findClass("com.android.server.am.ContentProviderRecord", loader);
         Class<?> process = XposedHelpers.findClass("com.android.server.am.ProcessRecord", loader);
         Class<?> processes = XposedHelpers.findClass("com.android.server.am.ProcessList", loader);
-        MainHook.hook(helper, "getContentProvider", appThread, String.class, String.class,
+        Class<?> holder = XposedHelpers.findClass("android.app.ContentProviderHolder", null);
+        Class<?> connection = XposedHelpers.findClass("com.android.server.am.ContentProviderConnection", loader);
+        Hooks.field(provider, "connections", List.class);
+        Hooks.field(provider, "provider", Object.class);
+        Hooks.field(connection, "waiting", boolean.class);
+        Hooks.field(connection, "client", process);
+        hook(helper, "getContentProvider", holder, appThread, String.class, String.class,
                 int.class, boolean.class, new XC_MethodHook() {
             @Override protected void afterHookedMethod(MethodHookParam p) throws Throwable {
                 int target = (Integer) p.args[3];
-                int caller = Binder.getCallingUid() / 100000;
+                int caller = Binder.getCallingUid() / ClonePolicy.USER_RANGE;
                 if (p.hasThrowable() || p.getResult() != null || !isClone.test(target)
                         || (caller != 0 && !isClone.test(caller))) return;
                 Object[] args = p.args.clone();
@@ -74,7 +81,7 @@ final class RuntimeFixes {
                 }
             }
         });
-        MainHook.hook(helper, "incProviderCountLocked", process, provider,
+        hook(helper, "incProviderCountLocked", connection, process, provider,
                 XposedHelpers.findClass("android.os.IBinder", null), int.class, String.class,
                 String.class, boolean.class, boolean.class, long.class, processes, int.class,
                 new XC_MethodHook() {
@@ -92,7 +99,7 @@ final class RuntimeFixes {
                 users.add(target);
             }
         });
-        MainHook.hook(provider, "onProviderPublishStatusLocked", boolean.class, new XC_MethodHook() {
+        hook(provider, "onProviderPublishStatusLocked", void.class, boolean.class, new XC_MethodHook() {
             @SuppressWarnings("unchecked") @Override protected void beforeHookedMethod(MethodHookParam p) {
                 boolean published = (Boolean) p.args[0];
                 for (Object connection : (List<?>) XposedHelpers.getObjectField(p.thisObject, "connections")) {
@@ -119,17 +126,19 @@ final class RuntimeFixes {
         });
 
         Class<?> computer = XposedHelpers.findClass("com.android.server.pm.ComputerEngine", loader);
-        MainHook.hook(computer, "getApplicationInfo", String.class, long.class, int.class,
+        Class<?> applicationInfo = XposedHelpers.findClass("android.content.pm.ApplicationInfo", null);
+        Hooks.field(applicationInfo, "uid", int.class);
+        hook(computer, "getApplicationInfo", applicationInfo, String.class, long.class, int.class,
                 new XC_MethodHook() {
             @Override protected void afterHookedMethod(MethodHookParam p) throws Throwable {
                 int callerUid = Binder.getCallingUid();
-                if (p.hasThrowable() || p.getResult() != null || callerUid / 100000 != 0
+                if (p.hasThrowable() || p.getResult() != null || callerUid / ClonePolicy.USER_RANGE != 0
                         || !isClone.test((Integer) p.args[2])) return;
                 Object[] args = p.args.clone();
                 args[2] = 0;
                 try {
                     Object info = original(p, args);
-                    // Owner services such as NFC need their own code for a clone Context, not installation.
+                    // Owner services may reuse their own code, never another package's identity.
                     if (info != null && XposedHelpers.getIntField(info, "uid") == callerUid) p.setResult(info);
                 } catch (Throwable error) {
                     p.setThrowable(error);
@@ -158,7 +167,6 @@ final class RuntimeFixes {
     }
 
     private static void deopt(Class<?> type, String name, Class<?>... args) throws Exception {
-        XposedBridge.class.getMethod("deoptimizeMethod", Member.class).invoke(null,
-                XposedHelpers.findMethodExact(type, name, args));
+        Deoptimization.member(XposedHelpers.findMethodExact(type, name, args));
     }
 }

@@ -1,6 +1,9 @@
 package com.lixingchi.motoappclone;
 
 import android.os.Binder;
+import dalvik.system.BaseDexClassLoader;
+import de.robv.android.xposed.XC_MethodHook;
+import de.robv.android.xposed.XposedBridge;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -128,17 +131,17 @@ public final class RuntimeHooksTest {
     }
     public static final class UserController {
         public final UserManagerService users = new UserManagerService();
-        public int maxRunningUsers = 8;
+        public int mMaxRunningUsers = 8;
         public final List<Integer> started = new ArrayList<>();
         public boolean fail;
         public Action duringStart;
         public void setInitialConfig(boolean userSwitchUiEnabled, int maxRunningUsers,
                 boolean delayUserDataLocking, int backgroundUserScheduledStopTimeSecs) {
-            this.maxRunningUsers = maxRunningUsers;
+            this.mMaxRunningUsers = maxRunningUsers;
         }
         public void startProfiles() throws Throwable {
             for (int i = 900; i <= 910; i++) {
-                if (i - 900 < maxRunningUsers - 1) started.add(i);
+                if (i - 900 < mMaxRunningUsers - 1) started.add(i);
                 else MainHook.invoke(users, "removeUser", i);
             }
             if (duringStart != null) { Action action = duringStart; duringStart = null; action.run(); }
@@ -150,10 +153,10 @@ public final class RuntimeHooksTest {
         Binder.setCallingUid(1000);
         UserController configured = new UserController();
         MainHook.invoke(configured, "setInitialConfig", true, 8, false, 0);
-        check(configured.maxRunningUsers == ClonePolicy.LIMIT);
+        check(configured.mMaxRunningUsers == ClonePolicy.LIMIT);
         UserController controller = new UserController();
         MainHook.invoke(controller, "startProfiles");
-        check(controller.maxRunningUsers == 8);
+        check(controller.mMaxRunningUsers == 8);
         check(controller.started.equals(Arrays.asList(900, 901, 902, 903, 904, 905, 906)));
         check(controller.users.removed.isEmpty());
         check((Boolean) MainHook.invoke(controller.users, "removeUser", 910));
@@ -272,13 +275,60 @@ public final class RuntimeHooksTest {
         check(ownerDenied.requests.equals(Arrays.asList(910, 0)));
     }
 
+    public abstract static class UnrelatedName {
+        public int value;
+        public void concrete() {}
+        public abstract void abstractMethod();
+        public native void nativeMethod();
+    }
+
+    public static void voidDeoptimization(java.lang.reflect.Member member) { checks++; }
+    public static String invalidDeoptimization(java.lang.reflect.Member member) { return "unsupported"; }
+
+    private static void contractTests() throws Throwable {
+        XC_MethodHook callback = new XC_MethodHook() {};
+        try {
+            Hooks.hook(UserManagerService.class, "removeUser", int.class, int.class, callback);
+            throw new AssertionError("Changed return type accepted");
+        } catch (IllegalArgumentException expected) { checks++; }
+        check(XposedBridge.HOOKS.isEmpty());
+        Hooks.field(UnrelatedName.class, "value", int.class);
+        try {
+            Hooks.field(UnrelatedName.class, "value", boolean.class);
+            throw new AssertionError("Changed field type accepted");
+        } catch (IllegalArgumentException expected) { checks++; }
+        Hooks.hook(UserManagerService.class, "removeUser", boolean.class, int.class, callback);
+        check(XposedBridge.HOOKS.size() == 1);
+        Hooks.rollback();
+        check(XposedBridge.HOOKS.isEmpty());
+        Deoptimization.application(new BaseDexClassLoader(UnrelatedName.class.getName(), UnrelatedName.class.getName()));
+        check(XposedBridge.DEOPTIMIZED.size() == 2); // Constructor and concrete method, once each.
+        XposedBridge.acceptDeoptimization = false;
+        try { Deoptimization.type(UnrelatedName.class); throw new AssertionError("Refusal ignored"); }
+        catch (IllegalStateException expected) { checks++; }
+        XposedBridge.acceptDeoptimization = true;
+        Deoptimization.member(RuntimeHooksTest.class.getMethod("voidDeoptimization", java.lang.reflect.Member.class),
+                UnrelatedName.class.getMethod("concrete"));
+        try {
+            Deoptimization.member(RuntimeHooksTest.class.getMethod("invalidDeoptimization", java.lang.reflect.Member.class),
+                    UnrelatedName.class.getMethod("concrete"));
+            throw new AssertionError("Unknown API result accepted");
+        } catch (IllegalStateException expected) { checks++; }
+        try { Deoptimization.application(new BaseDexClassLoader()); throw new AssertionError("Empty DEX accepted"); }
+        catch (IllegalStateException expected) { checks++; }
+    }
+
     public static void main(String[] args) throws Throwable {
+        contractTests();
         TYPES.put("com.android.server.am.UserController", UserController.class);
         TYPES.put("android.os.UserManager", UserManager.class);
         TYPES.put("com.android.server.pm.UserManagerService", UserManagerService.class);
         TYPES.put("com.android.server.am.ContentProviderHelper", ProviderHelper.class);
         TYPES.put("com.android.server.am.ActivityManagerService", ProviderHelper.class);
         TYPES.put("android.app.IApplicationThread", AppThread.class);
+        TYPES.put("android.app.ContentProviderHolder", Holder.class);
+        TYPES.put("com.android.server.am.ContentProviderConnection", Connection.class);
+        TYPES.put("android.content.pm.ApplicationInfo", ApplicationInfo.class);
         TYPES.put("android.os.IBinder", IBinder.class);
         TYPES.put("com.android.server.am.ContentProviderRecord", Provider.class);
         TYPES.put("com.android.server.am.ProcessRecord", ProcessRecord.class);
@@ -288,6 +338,8 @@ public final class RuntimeHooksTest {
         for (int id = 900; id <= 910; id++) clones.add(id);
         RuntimeFixes.install(null, clones::contains);
         bootTests(); providerTests(); packageTests();
+        Hooks.rollback();
+        check(XposedBridge.HOOKS.isEmpty());
         System.out.println("PASS: " + checks + " real-hook callback checks (JVM doubles; not Android runtime validation)");
     }
 }

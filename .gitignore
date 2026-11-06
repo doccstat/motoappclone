@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.apk
+*.jar
+*.keystore
+*.jks
+*.p12
+credentials.env
+ANDROID_*.txt
+*-diagnostics.json
+build-diagnostics.log
+firmware-audit.json
