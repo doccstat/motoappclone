@@ -112,16 +112,15 @@ manifest's `versionCode-versionName` tag; a same-version run replaces its tag an
 assets, while a superseded commit skips publication. Versions are explicitly
 maintained in the manifest: **0.5 / code 5**, tag **5-0.5**.
 
-Automatic releases are prereleases, not latest. Manual **Signed release**
-dispatch has an explicit `prerelease` input (default true); choosing false
-publishes stable/latest. This does not imply additional device validation.
-No workflow installs on a device. After the LSPosed listing exists and its README
-export is complete, configure `LSPOSED_RELEASE_TOKEN` with access only to that
-listing repository (Contents read/write). This explicitly enables automatic
-`distribute-release.yml` dispatch after publishing. Without it, signing succeeds
-and reports that distribution is disabled. Manual distribution requires an exact
-source tag and main branch; it preserves the source prerelease/stable status and
-verifies the checksum, certificate, package and version before upload.
+Main pushes and manual **Signed release** runs publish stable releases marked
+**Latest**, then dispatch `distribute-release.yml`. Configure
+`LSPOSED_RELEASE_TOKEN` with write access to the LSPosed listing: a classic
+`public_repo` PAT or a GitHub App with Contents read/write on that repository.
+
+Distribution always selects GitHub's **Latest** stable source release, including
+manual retries and published-release events. It verifies the checksum, certificate,
+package and version before creating or replacing the matching stable listing
+release, also marked **Latest**. There is no prerelease or tag-selection input.
 
 ## Diagnostics
 
