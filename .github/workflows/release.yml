@@ -4,11 +4,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      prerelease:
-        description: Publish as a prerelease
-        type: boolean
-        default: true
 
 permissions:
   contents: read
@@ -62,12 +57,10 @@ jobs:
           test -n "$KEYSTORE_BASE64"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode >"$SIGNING_KEYSTORE"
           python3 -B build.py --release
-      - name: Publish the manifest-declared version
+      - name: Replace the stable GitHub release for this version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LISTING_TOKEN: ${{ secrets.LSPOSED_RELEASE_TOKEN }}
           BUILD_DIR: ${{ runner.temp }}/motoappclone-dist
-          PRERELEASE: ${{ github.event_name == 'push' || inputs.prerelease }}
         run: |
           set -euo pipefail
           # An old rerun must not replace a newer push's assets.
@@ -79,8 +72,6 @@ jobs:
           version_code=$(python3 -c 'import xml.etree.ElementTree as ET; r=ET.parse("AndroidManifest.xml").getroot(); print(r.attrib["{http://schemas.android.com/apk/res/android}versionCode"])')
           version_name=$(python3 -c 'import xml.etree.ElementTree as ET; r=ET.parse("AndroidManifest.xml").getroot(); print(r.attrib["{http://schemas.android.com/apk/res/android}versionName"])')
           tag="$version_code-$version_name"
-          latest=false
-          if [ "$PRERELEASE" = false ]; then latest=true; fi
           cd "$BUILD_DIR"
           sha256sum -c MotoAppClone.apk.sha256
           cat >release-notes.md <<EOF
@@ -114,15 +105,12 @@ jobs:
               MotoAppClone.apk MotoAppClone.apk.sha256
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
               --title "$version_name" --notes-file release-notes.md \
-              --draft=false --prerelease="$PRERELEASE" --latest="$latest"
+              --draft=false --prerelease=false --latest
           else
             gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --title "$version_name" --notes-file release-notes.md \
-              --prerelease="$PRERELEASE" --latest="$latest" \
+              --prerelease=false --latest \
               MotoAppClone.apk MotoAppClone.apk.sha256
           fi
-          if [ -n "$LISTING_TOKEN" ]; then
-            gh workflow run distribute-release.yml --repo "$GITHUB_REPOSITORY" --ref main -f "tag=$tag"
-          else
-            echo 'Listing distribution not enabled: submit the package, export its listing, then set LSPOSED_RELEASE_TOKEN.'
-          fi
+          # GITHUB_TOKEN release writes do not trigger release-event workflows.
+          gh workflow run distribute-release.yml --repo "$GITHUB_REPOSITORY" --ref main
