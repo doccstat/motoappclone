@@ -4,6 +4,8 @@ Create more app clones with Motorola’s built-in app cloning. Keep using the
 stock cloning interface, launcher icons and separate app data—no repackaged APKs
 or separate clone manager.
 
+![Creating another clone in Motorola’s app-cloning interface and viewing its home-screen icon](docs/screen-20261106-230957.gif)
+
 ## Requirements
 
 - A Motorola device running Android 16 or later with native app cloning.
